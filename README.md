@@ -62,20 +62,21 @@ export AI_GATEWAY_MODEL="anthropic/claude-sonnet-4.6"
 
 `VERCEL_AI_GATEWAY` is the key variable used by this project. It must be exported so the MCP process inherits it; a shell-only assignment is insufficient. Restart your coding client after changing its environment. The server does not read `.zshrc` itself. A normal Vercel account token is not an AI Gateway key.
 
-Install Jev Review directly from GitHub—no npm publication is required:
+From this Vercel-enabled checkout, install dependencies and build the server:
 
 ```bash
-npx plugins add NiazMorshed2007/jev-review
+npm install
+npm run validate
 ```
 
-Choose your coding client when prompted, restart it, and ask the agent to use `jev-review` while implementing a nontrivial change.
+Register the local bundle using the [Claude Code](#claude-code) or [Codex](#codex) instructions below, then restart your client. The upstream `NiazMorshed2007/jev-review` installer installs that repository's version, which may not include this migration.
 
 ## How to use
 
 ### For humans
 
 1. Export `VERCEL_AI_GATEWAY` in your shell (for zsh, put `export VERCEL_AI_GATEWAY="your-key"` in `~/.zshrc`). Never commit the key. Open a new terminal or run `source ~/.zshrc`, then launch your coding client from that terminal.
-2. For this checkout, run `npm install` and `npm run validate`, then register its absolute `dist/server.js` path using the manual configuration in [Client setup](#client-setup). The upstream GitHub installer below installs the upstream repository, not your local migration.
+2. For this checkout, run `npm install` and `npm run validate`, then register its absolute `dist/server.js` path using the manual configuration in [Client setup](#client-setup). Use this checkout when registering the server so the client runs the Vercel-enabled version.
 3. Confirm the `jev_review` MCP tool is available. Ask your agent:
 
    > Use jev-review to review my current diff against the task requirements. Inspect the highest-priority findings, fix only justified issues, run tests, then review the changed code again with the previous evaluation.
@@ -106,7 +107,9 @@ Inspect `metrics`, `priorities`, and, on follow-up calls, `comparison`, `improve
 | Symptom | Action |
 | --- | --- |
 | `VERCEL_AI_GATEWAY is not set` | Export the variable and restart the client from that shell; check GUI environment inheritance. Never print the key to debug it. |
-| HTTP 401 / 403 | Check that the value is an active AI Gateway key and the MCP client inherited it. |
+| HTTP 401 / 403 | Check the Gateway key and its account access. A 403 can also indicate account verification or model-access restrictions; it does not always mean the key is invalid. |
+| `customer_verification_required` | Complete payment-card verification for the team that owns the key in Vercel AI Gateway. |
+| Free-tier model restriction | Add paid Gateway credits or select a model available to your account. The Sonnet 4.6 smoke test required paid credits. |
 | HTTP 402 | Check Vercel AI Gateway credits and billing. |
 | HTTP 429 / 5xx | Transient failures are retried twice; retry later if they persist. |
 | Invalid structured review | Retry once or select a model supporting JSON-schema structured outputs. Truncated, refused, or malformed responses are rejected. |
@@ -143,40 +146,60 @@ Every client starts the same bundled `dist/server.js` process locally over stdio
 
 ### Claude Code
 
-```bash
-npx plugins add NiazMorshed2007/jev-review --target claude-code
-```
-
-Restart Claude Code and run `/mcp` to confirm that `jev-review` is connected.
-
-To load a local clone while developing:
+For macOS/zsh, register the server for all your projects. Replace the example path with the absolute path to this checkout; retain the quotes, especially if the path contains spaces:
 
 ```bash
-claude --plugin-dir /absolute/path/to/jev-review
+claude mcp add --scope user jev-review-vercel -- /bin/zsh -ic \
+  'export VERCEL_AI_GATEWAY; exec node "/absolute/path/to/jev-review-vercel-ai/dist/server.js"'
+claude mcp get jev-review-vercel
 ```
 
-Manual MCP-only setup:
+The interactive shell loads `~/.zshrc` and exports the key to the server without copying it into Claude's configuration. Keep shell startup output quiet because MCP uses stdout for protocol messages. `node` must be available in that shell.
+
+Restart Claude Code and run `/mcp` to confirm that **jev-review-vercel** is connected. Ask: “Use the jev-review-vercel MCP server to review my current diff.” Its underlying tool is still `jev_review`.
+
+The distinct server name avoids collisions with an existing plugin-provided `jev-review` entry. A project entry using `${CLAUDE_PLUGIN_ROOT}` is intended for plugin loading; the command above runs this checkout directly. User-scoped MCP settings are stored in your personal Claude configuration, not committed to this repository. This registers the MCP tool only; agents can read [the bundled skill](skills/jev-review/SKILL.md) for the full workflow.
+
+If your client already inherits the exported key, you can instead use:
 
 ```bash
-claude mcp add --scope user jev-review -- node /absolute/path/to/jev-review/dist/server.js
+claude mcp add --scope user jev-review-vercel -- node /absolute/path/to/jev-review-vercel-ai/dist/server.js
 ```
+
+Choose one registration method. To replace an existing user entry, remove it with `claude mcp remove jev-review-vercel --scope user` before adding it again.
 
 ### Codex
 
+For macOS/zsh, register the same local bundle:
+
 ```bash
-npx plugins add NiazMorshed2007/jev-review --target codex
+codex mcp add jev-review -- /bin/zsh -ic \
+  'export VERCEL_AI_GATEWAY; exec node "/absolute/path/to/jev-review-vercel-ai/dist/server.js"'
+codex mcp get jev-review
 ```
 
-Restart Codex and run `/mcp` to verify the connection.
+In the resulting `~/.codex/config.toml` entry, set `tool_timeout_sec = 420` to allow time for the server's 120-second attempts and transient-error retries. The complete entry looks like:
 
-Manual setup in `~/.codex/config.toml`:
+```toml
+[mcp_servers.jev-review]
+command = "/bin/zsh"
+args = ["-ic", 'export VERCEL_AI_GATEWAY; exec node "/absolute/path/to/jev-review-vercel-ai/dist/server.js"']
+tool_timeout_sec = 420
+```
+
+As with Claude Code, this loads the key from `~/.zshrc` without storing its value in the MCP configuration. Restart Codex to load `jev_review` into a new session. Registration does not add tools to a session that is already running.
+
+If Codex already inherits the exported environment, use this entry instead:
 
 ```toml
 [mcp_servers.jev-review]
 command = "node"
-args = ["/absolute/path/to/jev-review/dist/server.js"]
+args = ["/absolute/path/to/jev-review-vercel-ai/dist/server.js"]
 env_vars = ["VERCEL_AI_GATEWAY", "AI_GATEWAY_MODEL"]
+tool_timeout_sec = 420
 ```
+
+Use only one `[mcp_servers.jev-review]` entry. These settings are personal configuration and are not included in repository commits.
 
 ### Cursor
 
