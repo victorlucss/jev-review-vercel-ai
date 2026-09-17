@@ -16,7 +16,8 @@ export async function reviewWithJev(
 ): Promise<Evaluation> {
   const input = reviewInputSchema.parse(rawInput);
   const client = dependencies.client ?? new JevClient({
-    apiKey: dependencies.apiKey ?? getJevApiKey()
+    apiKey: dependencies.apiKey ?? getJevApiKey(),
+    model: process.env.AI_GATEWAY_MODEL?.trim() || ""
   });
   const response = await client.evaluate(toJevState(input), buildJevQuestions());
   return toEvaluation(response, input.previousEvaluation);

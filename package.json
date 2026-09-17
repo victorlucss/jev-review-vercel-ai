@@ -2,7 +2,7 @@
   "name": "jev-review",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first software-quality evaluation for AI coding agents, powered by Jev.",
+  "description": "Local-first software-quality evaluation for AI coding agents, powered by Vercel AI Gateway.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -10,7 +10,7 @@
   "scripts": {
     "build": "esbuild src/server.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/server.js --banner:js=\"#!/usr/bin/env node\"",
     "check": "tsc --noEmit",
-    "test": "tsc --project tsconfig.test.json && node --test .test-dist/test/**/*.test.js",
+    "test": "tsc --project tsconfig.test.json && node --test .test-dist/test/*.test.js",
     "validate": "npm run check && npm test && npm run build"
   },
   "dependencies": {

@@ -5,12 +5,12 @@ import { JevApiError, JevClient, JEV_API_ENDPOINT, JEV_MODEL } from "../src/jev/
 
 const validResponse = {
   model: JEV_MODEL,
-  answers: {},
-  usage: { input_tokens: 10, output_tokens: 2 }
+  choices: [{ message: { content: "{}" }, finish_reason: "stop" }],
+  usage: { prompt_tokens: 10, completion_tokens: 2 }
 };
 
 describe("Jev client", () => {
-  it("sends the key only in the direct Jev authorization header", async () => {
+  it("sends the key only in the Vercel AI Gateway authorization header", async () => {
     let observedUrl = "";
     let observedAuthorization = "";
     let observedBody: Record<string, unknown> = {};
@@ -30,7 +30,7 @@ describe("Jev client", () => {
     assert.equal(observedUrl, JEV_API_ENDPOINT);
     assert.equal(observedAuthorization, "Bearer test-secret");
     assert.equal(observedBody.model, JEV_MODEL);
-    assert.deepEqual(observedBody.state, { diff: "+ change" });
+    assert.deepEqual(JSON.parse((observedBody.messages as { content: string }[])[1]!.content).state, { diff: "+ change" });
   });
 
   it("retries documented transient failures with bounded backoff", async () => {
@@ -59,9 +59,9 @@ describe("Jev client", () => {
     assert.throws(() => new JevClient({ apiKey: " " }), JevApiError);
   });
 
-  it("explains Jev's upstream token-limit response", async () => {
+  it("explains Gateway's upstream token-limit response", async () => {
     const fakeFetch: typeof fetch = async () =>
-      new Response(JSON.stringify({ detail: { error_type: "max_tokens_exceeded" } }), {
+      new Response(JSON.stringify({ error: { code: "context_length_exceeded" } }), {
         status: 400,
         headers: { "content-type": "application/json" }
       });
